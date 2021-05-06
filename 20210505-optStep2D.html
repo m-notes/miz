@@ -142,16 +142,6 @@
 
     function drawFunc() {
         let dotNum = 100;
-        let maxVal = -1000000;
-        let minVal = 10000000;
-        for (let i = 0; i < dotNum; i++) {
-            let x = (X_MAX - X_MIN) / dotNum * i + X_MIN;
-            for (let j = 0; j < dotNum; j++) {
-                let y = (Y_MAX - Y_MIN) / dotNum * j + Y_MIN;
-                if (testFunc(x, y) > maxVal) maxVal = testFunc(x, y);
-                if (testFunc(x, y) < minVal) minVal = testFunc(x, y);
-            }
-        }
 
         let bw = GlobalWidth() / (dotNum + 1);
         let bh = GlobalHeight() / (dotNum + 1);
@@ -160,7 +150,7 @@
             for (let j = 0; j < dotNum; j++) {
                 let y = (Y_MAX - Y_MIN) / dotNum * j + Y_MIN;
                 let val = testFunc(x, y);
-                context2D.fillStyle = val2Color(val, minVal, maxVal);
+                context2D.fillStyle = val2Color(val, V_MIN, V_MAX);
                 context2D.fillRect(cx(x), cy(y) - bh, bw, bh);
             }
         }
@@ -169,7 +159,7 @@
     function drawStart() {
 
         plotWs(Ws, "yellow", "勾配法");
-        plotWs(WsMoment, "green", "慣性");
+        plotWs(WsMoment, "yellowgreen", "慣性");
         plotWs(WsAdaGrad, "red", "AdaGrad");
     }
 
@@ -201,12 +191,84 @@
         if (SHOW_TEXT) drawText(aStr, cx(aWs[aWs.length - 1].x), cy(aWs[aWs.length - 1].y), aColor);
     }
 
-    function canvasClear() {
+    function cutPoint(val, x1, y1, x2, y2) {
+        let v1 = testFunc(x1, y1);
+        let v2 = testFunc(x2, y2);
+        if ((v1 - val) * (v2 - val) >= 0) return { isCut: false };
 
+        let lambda = (val - v2) / (v1 - v2);
+
+        return { isCut: true, x: lambda * x1 + (1 - lambda) * x2, y: lambda * y1 + (1 - lambda) * y2 };
+    }
+
+    function accumelateIsopleths(aVal, aLineSegments, aSquareNum) {
+        let squareNum = aSquareNum;
+        let w = (X_MAX - X_MIN) / squareNum;
+        let h = (Y_MAX - Y_MIN) / squareNum;
+
+        for (let i = 0; i < squareNum; i++) {
+            for (let j = 0; j < squareNum; j++) {
+                let x0 = w * i + X_MIN; //左下の座標
+                let y0 = h * j + Y_MIN;
+
+                let ps = new Array(4);
+                ps[0] = cutPoint(aVal, x0, y0, x0, y0 + h);
+                ps[1] = cutPoint(aVal, x0, y0 + h, x0 + w, y0 + h);
+                ps[2] = cutPoint(aVal, x0 + w, y0 + h, x0 + w, y0);
+                ps[3] = cutPoint(aVal, x0 + w, y0, x0, y0);
+
+                let cutPoints = [];
+                for (let p of ps) if (p.isCut) cutPoints.push(p);
+
+                if (cutPoints.length >= 2) {
+                    aLineSegments.push({ val: aVal, fromX: cutPoints[0].x, fromY: cutPoints[0].y, toX: cutPoints[1].x, toY: cutPoints[1].y });
+                }
+            }
+        }
+    }
+
+    let V_MIN = 0.0;
+    let V_MAX = 10.0;
+
+    function detectMinMaxVal() {
+        let dotNum = 100;
+        let maxVal = -1000000;
+        let minVal = 10000000;
+        for (let i = 0; i < dotNum; i++) {
+            let x = (X_MAX - X_MIN) / dotNum * i + X_MIN;
+            for (let j = 0; j < dotNum; j++) {
+                let y = (Y_MAX - Y_MIN) / dotNum * j + Y_MIN;
+                if (testFunc(x, y) > maxVal) maxVal = testFunc(x, y);
+                if (testFunc(x, y) < minVal) minVal = testFunc(x, y);
+            }
+        }
+
+        V_MIN = minVal;
+        V_MAX = maxVal;
+    }
+
+    let ISOPLETHS_LINESEGMENT = [];
+    function accumelateAllIsopleths() {
+        let dotNum = 20;
+        for (let i = 0; i < dotNum; i++) {
+            let v = i * (V_MAX - V_MIN) / dotNum + V_MIN;
+            accumelateIsopleths(v, ISOPLETHS_LINESEGMENT, 100);
+        }
+    }
+    function drawIsopleths() {
+
+        for (let l of ISOPLETHS_LINESEGMENT) {
+            context2D.beginPath();
+            context2D.lineWidth = "0.5";
+            context2D.strokeStyle = "blue";
+            context2D.moveTo(cx(l.fromX), cy(l.fromY));
+            context2D.lineTo(cx(l.toX), cy(l.toY));
+            context2D.stroke();
+        }
+    }
+
+    function canvasClear() {
         context2D.clearRect(0, 0, context2D.canvas.width, context2D.canvas.height);
-        //context2D.globalAlpha = 0.7;
-        //context2D.fillStyle = "rgba(0.5, 1.0, 0.5, 0.5)";
-        //context2D.fillRect(0, 0, context2D.canvas.width, context2D.canvas.height);
     }
 
     function GlobalWidth() {
@@ -273,10 +335,9 @@
 
     function drawBacks() {
         drawFunc();
+        drawIsopleths();
         drawPlotArea();
         drawAxis();
-
-
     }
 
     function init() {
@@ -287,6 +348,9 @@
         context2D = canvas2D.getContext("2d");
 
         setTouchAction();
+
+        detectMinMaxVal();
+        accumelateAllIsopleths();
 
         drawBacks();
     }

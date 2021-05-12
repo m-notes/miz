@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>勾配法デモ</title>
+    <style>
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<script>
+
+    let Ws = [];
+
+    function testFunc(aX) {
+        return 25 * Math.pow(aX, 2) / 35 + Math.sin(5 * aX) / 5;
+        //return Math.pow(aX, 2) / 7 + Math.sin(2 * aX);
+    }
+    function testFuncDev(aX) {
+        return 25 * 2 * aX / 35 + Math.cos(5 * aX);
+        //return aX / 3.5 + 2 * Math.cos(2 * aX);
+    }
+
+    function update() {
+        if (Ws.length < 1) return;
+        let newW = DG(Ws[Ws.length - 1]);
+        Ws.push(newW);
+    }
+
+    function DG(W) {
+        let ETA = 0.1;
+        return W - ETA * testFuncDev(W);
+    }
+
+    /*
+    Canvas 座標は左上が (0, 0)、右下が (GlobalWidth(), GlobalHeight())。
+    Canvas 座標を (cx, cy) で表す。
+    
+    論理座標は左下が (-X_MIN, -Y_MIN)、右上が (X_MAX, Y_MAX)。
+    論理座標を (x,y) で表す。
+
+    論理座標 -> Canvas 座標は cx(x)、cy(y)
+    Canvas 座標 -> 論理座標は lx(cx)、ly(cy)
+
+    プロットエリアは、(0.05 * Global---) から (0.95 * Global ---)。
+    */
+    let X_MIN = -1.0;
+    let X_MAX = 1.0;
+    let Y_MIN = -0.2;
+    let Y_MAX = 1.0;
+
+    function cx(aX) {
+        return (aX - X_MIN) / (X_MAX - X_MIN) * 0.9 * GlobalWidth() + 0.05 * GlobalWidth();
+    }
+    function cy(aY) {
+        return (Y_MAX - aY) / (Y_MAX - Y_MIN) * 0.9 * GlobalHeight() + 0.05 * GlobalHeight();
+    }
+
+    function lx(aCX) {
+        return (aCX / GlobalWidth() - 0.05) * (X_MAX - X_MIN) / 0.9 + X_MIN;
+    }
+    function ly(aCY) {
+        return Y_MAX - (aCY / GlobalHeight() - 0.05) * (Y_MAX - Y_MIN) / 0.9;
+    }
+
+    function drawPlotArea() {
+        context2D.beginPath();
+        context2D.lineWidth = "0.5";
+        context2D.strokeStyle = "gray";
+        context2D.rect(cx(X_MIN), cy(Y_MIN), cx(X_MAX) - cx(X_MIN), cy(Y_MAX) - cy(Y_MIN));
+        context2D.stroke();
+    }
+
+    function drawAxis() {
+        context2D.beginPath();
+        context2D.lineWidth = "1";
+        context2D.strokeStyle = "black";
+        context2D.moveTo(cx(0.0), cy(Y_MIN));
+        context2D.lineTo(cx(0.0), cy(Y_MAX));
+        context2D.stroke();
+
+        context2D.beginPath();
+        context2D.moveTo(cx(X_MIN), cy(0.0));
+        context2D.lineTo(cx(X_MAX), cy(0.0));
+        context2D.stroke();
+
+        drawText("error", cx(0.0), cy(Y_MAX), "black");
+        drawText("weight", cx(X_MAX) * 0.95, cy(0.0), "black");
+    }
+
+    function drawText(txt, x, y, color) {
+        context2D.font = "40px 'Times'";
+        context2D.fillStyle = color;
+        context2D.fillText(txt, x, y);
+    }
+
+    function drawFunc() {
+        let dotNum = 1000;
+
+        context2D.beginPath();
+        context2D.lineWidth = "3";
+        context2D.strokeStyle = "black";
+        context2D.moveTo(cx(X_MIN), cy(testFunc(X_MIN)));
+        for (let i = 0; i < dotNum; i++) {
+            let newX = (X_MAX - X_MIN) / dotNum * i + X_MIN;
+            context2D.lineTo(cx(newX), cy(testFunc(newX)));
+        }
+        context2D.stroke();
+    }
+
+    function darwStart() {
+        if (Ws.length < 1) return;
+
+        context2D.beginPath();
+        context2D.lineWidth = "3";
+        context2D.strokeStyle = "red";
+        context2D.moveTo(cx(Ws[0]), cy(testFunc(Ws[0])));
+        context2D.lineTo(cx(Ws[0]), cy(0.0));
+        context2D.stroke();
+
+        context2D.beginPath();
+        context2D.fillStyle = "red";
+        context2D.arc(cx(Ws[0]), cy(testFunc(Ws[0])), 5, 0, 2 * Math.PI, true);
+        context2D.fill();
+
+        context2D.beginPath();
+        context2D.fillStyle = "red";
+        context2D.arc(cx(Ws[0]), cy(0.0), 5, 0, 2 * Math.PI, true);
+        context2D.fill();
+
+        if (Ws.length <= 1) return;
+
+        for (let i = 1; i < Ws.length; i++) {
+
+            context2D.beginPath();
+            context2D.lineWidth = "0.5";
+            context2D.strokeStyle = "black";
+            context2D.moveTo(cx(Ws[i - 1]), cy(testFunc(Ws[i - 1])));
+            context2D.lineTo(cx(Ws[i]), cy(testFunc(Ws[i])));
+            context2D.lineTo(cx(Ws[i]), cy(0.0));
+            context2D.stroke();
+
+            //console.log(Ws[i]);
+        }
+
+        context2D.beginPath();
+        context2D.fillStyle = "blue";
+        context2D.arc(cx(Ws[Ws.length - 1]), cy(testFunc(Ws[Ws.length - 1])), 5, 0, 2 * Math.PI, true);
+        context2D.fill();
+
+        context2D.beginPath();
+        context2D.fillStyle = "blue";
+        context2D.arc(cx(Ws[Ws.length - 1]), cy(0.0), 5, 0, 2 * Math.PI, true);
+        context2D.fill();
+    }
+
+    function canvasClear() {
+
+        context2D.clearRect(0, 0, context2D.canvas.width, context2D.canvas.height);
+        //context2D.globalAlpha = 0.7;
+        //context2D.fillStyle = "rgba(0.5, 1.0, 0.5, 0.5)";
+        //context2D.fillRect(0, 0, context2D.canvas.width, context2D.canvas.height);
+    }
+
+    function GlobalWidth() {
+        //return 1113;  // for iPad
+        return window.innerWidth;
+    }
+    function GlobalHeight() {
+        //return 765;  // for iPad
+        return window.innerHeight;
+    }
+
+    function start(p) {
+        Ws = [lx(p.x)];
+        redraw();
+    }
+
+    function mouseClick(e) {
+        let p = { x: 0.0, y: 0.0 };
+
+        p.x = e.clientX;
+        p.y = e.clientY;
+
+        console.log(lx(p.x), ly(p.y));
+        start(p);
+    }
+
+    function setTouchAction() {
+        let t = document.getElementById("canvas2d");
+        let p = { x: 0.0, y: 0.0 };
+
+        // タッチ開始時： xy座標を取得
+        t.addEventListener("touchstart", function (e) {
+            e.preventDefault();
+            p.x = e.touches[0].pageX;
+            p.y = e.touches[0].pageY;
+
+            console.log(lx(p.x), ly(p.y));
+            start(p);
+        });
+    }
+
+    function keydown(event) {
+        if (event.key == ' ') {
+            update();
+            redraw();
+        }
+    }
+
+
+    function redraw() {
+        canvasClear();
+        drawBacks();
+
+        darwStart();
+    }
+
+    function drawBacks() {
+        drawPlotArea();
+        drawAxis();
+        drawFunc();
+
+    }
+
+    function init() {
+
+        canvas2D = document.getElementById("canvas2d");
+        canvas2D.width = GlobalWidth();
+        canvas2D.height = GlobalHeight();
+        context2D = canvas2D.getContext("2d");
+
+        setTouchAction();
+
+        drawBacks();
+    }
+
+    window.onload = init;
+    window.onmousedown = mouseClick;
+    window.onkeydown = keydown;
+
+</script>
+
+<body>
+
+    <!--<canvas id="canvas2d" style="position:fixed; top:0px; left:0px; background-color:rgba(0,0,0,0);"></canvas>-->
+    <H1>勾配降下法: デモ</H1>
+
+    <P>クリックで重みの初期値を設定。スペースキーで重みの更新を進める。</P>
+
+
+    <!--
+    <canvas id="canvas2d" style="z-index:-1;position:fixed; top:0; left:0; width:100%;height:100%;"></canvas>
+    -->
+    <!--<canvas id="canvas2d" style="z-index:-1;position:fixed; top:0; left:0; width:500;height:300;"></canvas>-->
+    <canvas id="canvas2d"></canvas>
+</body>
+
+</html>
